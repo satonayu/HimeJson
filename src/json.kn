@@ -1,0 +1,1027 @@
+{############################################################################ 
+	HimeJson for Kuin  ver 2017.11.30
+
+	Created by @satonayu
+		http://hime.be/
+		http://twitter.com/satonayu
+	
+    License: くいなちゃんライセンス( http://kuina.ch/others/license )
+############################################################################}
+const VER: []char :: "2017.11.30"
+
+
+; 入力された値の形式が不正
+const himeJsonInvalidDataFmt: int :: 16#00001001
+
+; 文字列に制御文字が使われている場合に発生
+const himeJsonControlCharacterExists: int :: 16#00001002
+
+; 要素がカンマで区切られていない場合に発生
+const himeJsonNoComma: int :: 16#00001003
+
+; オブジェクト要素で同じキーがすでに存在している
+const himeJsonSameKeyExists: int :: 16#00001004
+
+; true, false, null以外の単語が入力された
+const himeJsonInvalidWord: int :: 16#00001005
+
+
+; エラーメッセージ
+const errPath: []char :: "\"<path>\"のうち、\"<key>\"が見つかりませんでした。"
+const errNoParent: []char :: "親要素を持たないノードでparent()が呼ばれました。"
+const errNoChild: []char :: "子要素を持たないノードでfind()が呼ばれました。"
+const errIndexType: []char :: "配列のインデックスに数値変換できない値が指定されました。"
+const errIndexRange: []char :: "配列のインデックス範囲外の値が指定されました。"
+const errInvalidKey: []char :: "無効なキーが指定されました。"
+
+
+; ファイルからJsonオブジェクト作成
++func makeJsonF(path: []char): @Json
+	var parser: @JsonParser :: #@JsonParser
+	var scanner: @FileScanner :: #@FileScanner
+	
+	do scanner.setup(path)
+	do parser.setup(scanner)
+	try
+		ret parser.parseValue()
+	
+	finally
+		do scanner.dispose()
+	end try
+end func
+
+
+; テキスト（[]char）からJsonオブジェクト作成
++func makeJsonT(data: []char): @Json
+	var parser: @JsonParser :: #@JsonParser
+	var scanner: @TextScanner :: #@TextScanner
+	
+	do scanner.setup(data)
+	do parser.setup(scanner)
+	ret parser.parseValue()
+end func
+
+
+
++enum JsonType
+	jerr
+	jnull
+	jbool
+	jnum
+	jstr
+	jary
+	jobj
+end enum
+
+
+
++class Json()
+	var _parent: @Json
+	
+	
+	+func type(): @JsonType
+		ret %jnull
+	end func
+	
+	
+	+func root(): @Json
+		if (me._parent =& null)
+			ret me
+		end if
+		ret me._parent.root()
+	end func
+	
+	
+	+func parent(): @Json
+		if (me._parent =& null)
+			var err: @JsonError :: #@JsonError
+			do err.addMessage(@errNoParent)
+			ret err
+		end if
+		ret me._parent
+	end func
+	
+	
+	+func setParent(parent: @Json)
+		do me._parent :: parent
+	end func
+	
+	
+	+func find(key: []char): @Json
+		var err: @JsonError :: #@JsonError
+		do err.addMessage(@errNoChild)
+		ret err
+	end func
+	
+	
+	+func at(path: []char): @Json
+		var keys: [][]char :: path.split("/")
+		var item: @Json :: me
+		
+		for index(0, ^keys - 1)
+			switch(keys[index])
+			case "", "."
+				skip index
+				
+			case ".."
+				do item :: me.parent()
+				
+			default
+				do item :: item.find(keys[index])
+			end switch
+			
+			if (item.type() = %jerr)
+				var msg: []char :: @errPath.replace("<path>", path).replace("<key>", keys[index])
+				do item.toJErr().addMessage(msg)
+				break index
+			end if
+		end for
+		
+		ret item
+	end func
+	
+	
+	+func toBool(): bool
+		ret false
+	end func
+	
+	
+	+func toInt(value: &int): bool
+		ret false
+	end func
+	
+	
+	+func toi(): int
+		var value: int
+		do me.toInt(&value)
+		ret value
+	end func
+	
+	
+	+func toFloat(value: &float): bool
+		ret false
+	end func
+	
+	
+	+func tof(): float
+		var value: float
+		do me.toFloat(&value)
+		ret value
+	end func
+	
+	
+	+*func toStr(): []char
+		ret ""
+	end func
+	
+	
+	+func toStrFmt(fmt: []char): []char
+		ret ""
+	end func
+	
+	
+	+func dump(): []char
+		ret me.toStr()
+	end func
+	
+	
+	+func toJBool(): @JsonBool
+		ret me $ @JsonBool
+	end func
+	
+	
+	+func toJNum(): @JsonNumeric
+		ret me $ @JsonNumeric
+	end func
+	
+	
+	+func toJStr(): @JsonString
+		ret me $ @JsonString
+	end func
+	
+	
+	+func toJAry(): @JsonArray
+		ret me $ @JsonArray
+	end func
+	
+	
+	+func toJObj(): @JsonObject
+		ret me $ @JsonObject
+	end func
+	
+	
+	+func toJErr(): @JsonError
+		ret me $ @JsonError
+	end func
+end class
+
+
+
++class JsonBool(@Json)
+	var value: bool
+	
+	
+	+func setValue(value: bool)
+		do me.value :: value
+	end func
+	
+	
+	+*func type(): @JsonType
+		ret %jbool
+	end func
+	
+	
+	+*func toBool(): bool
+		ret me.value
+	end func
+	
+	
+	+*func toInt(value: &int): bool
+		do value :: me.value ?(1, 0)
+		ret true
+	end func
+	
+	
+	+*func toFloat(value: &float): bool
+		do value :: me.value ?(1.0, 0.0)
+		ret true
+	end func
+	
+	
+	+*func toStr(): []char
+		ret me.value ?("true", "false")
+	end func
+end class
+
+
+
++class JsonNumeric(@Json)
+	var value: float
+	
+	
+	+func setValue(value: float)
+		do me.value :: value
+	end func
+	
+	
+	+*func type(): @JsonType
+		ret %jnum
+	end func
+	
+	
+	+*func toBool(): bool
+		ret me.value <> 0.0
+	end func
+	
+	
+	+*func toInt(value: &int): bool
+		do value :: me.value$int
+		ret true
+	end func
+	
+	
+	+*func toFloat(value: &float): bool
+		do value :: me.value
+		ret true
+	end func
+	
+	
+	+*func toStr(): []char
+		ret me.value.toStr()
+	end func
+	
+	
+	+*func toStrFmt(fmt: []char): []char
+		ret me.value.toStrFmt(fmt)
+	end func
+end class
+
+
+
++class JsonString(@Json)
+	var value: []char
+	
+	
+	*func ctor()
+		do me.value :: ""
+	end func
+	
+	
+	+func setValue(value: []char)
+		do me.value :: value
+	end func
+	
+	
+	+*func type(): @JsonType
+		ret %jstr
+	end func
+	
+	
+	+*func toBool(): bool
+		ret ["", "0", "0.0", "false"].find(me.value, -1) = -1
+	end func
+	
+	
+	+*func toInt(value: &int): bool
+		ret me.value.toInt(&value)
+	end func
+	
+	
+	+*func toFloat(value: &float): bool
+		ret me.value.toFloat(&value)
+	end func
+	
+	
+	+*func toStr(): []char
+		ret me.value
+	end func
+	
+	
+	+*func dump(): []char
+		ret "\"\{me.toStr()}\""
+	end func
+end class
+
+
+
++class JsonArray(@Json)
+	var value: list<@Json>
+	
+	
+	*func ctor()
+		do me.value :: #list<@Json>
+	end func
+	
+	
+	+func setValue(value: list<@Json>)
+		do me.value :: value
+	end func
+	
+	
+	+*func type(): @JsonType
+		ret %jary
+	end func
+	
+	
+	+*func find(key: []char): @Json
+		var index: int
+		
+		if (!key.toInt(&index))
+			var err: @JsonError :: #@JsonError
+			do err.addMessage(@errIndexType)
+			ret err
+		end if
+		
+		if (index < 0 | index >= ^me.value)
+			var err: @JsonError :: #@JsonError
+			do err.addMessage(@errIndexRange)
+			ret err
+		end if
+		
+		do me.value.head()
+		ret me.value.getOffset(index)
+	end func
+	
+	
+	+*func toBool(): bool
+		ret me.len() > 0
+	end func
+	
+	
+	+*func toInt(value: &int): bool
+		do value :: me.len()
+		ret true
+	end func
+	
+	
+	+*func toFloat(value: &float): bool
+		do value :: me.len()$float
+		ret true
+	end func
+	
+	
+	+*func dump(): []char
+		var text: []char :: "["
+		do me.value.head()
+		
+		while loop(!me.value.term())
+			do text :~ me.value.get().dump()
+			do me.value.next()
+			if (!me.value.term())
+				do text :~ ","
+			end if
+		end while
+		
+		do text :~ "]"
+		ret text
+	end func
+	
+	
+	+func len(): int
+		ret ^me.value
+	end func
+	
+	
+	+func add(item: @Json)
+		do item.setParent(me)
+		do me.value.tail()
+		do me.value.add(item)
+	end func
+	
+	
+	+func addAt(index: int, item: @Json)
+		do me.value.head()
+		do me.value.moveOffset(index)
+		do me.value.ins(item)
+	end func
+	
+	
+	+func del(item: @Json): bool
+		do me.value.head()
+		
+		while(!me.value.term())
+			if (me.value.get() =& item)
+				do me.value.del()
+				ret true
+			end if
+			do me.value.next()
+		end while
+		
+		ret false
+	end func
+	
+	
+	+func delAt(index: int): bool
+		do me.value.head()
+		do me.value.moveOffset(index)
+		
+		if (me.value.term())
+			ret false
+		end if
+		
+		do me.value.del()
+		ret true
+	end func
+	
+	
+	+func forEach(callback: func<(@Json, kuin@Class): bool>, data: kuin@Class): bool
+		var breakFlg: bool :: false
+		do me.value.head()
+		
+		while (!me.value.term())
+			do breakFlg :: callback(me.value.get(), data)
+			if (!breakFlg)
+				ret false
+			end if
+			do me.value.next()
+		end while
+		
+		ret true
+	end func
+	
+	
+	+func hasItem(item: @Json): bool
+		do me.value.head()
+		
+		while(!me.value.term())
+			if (me.value.get() =& item)
+				ret true
+			end if
+			do me.value.next()
+		end while
+		
+		ret false
+	end func
+end class
+
+
+
++class JsonObject(@Json)
+	var value: dict<[]char, @Json>
+	
+	
+	*func ctor()
+		do me.value :: #dict<[]char, @Json>
+	end func
+	
+	
+	+func setValue(value: dict<[]char, @Json>)
+		do me.value :: value
+	end func
+	
+	
+	+*func type(): @JsonType
+		ret %jobj
+	end func
+	
+	
+	+*func find(key: []char): @Json
+		if (!me.exist(key))
+			var err: @JsonError :: #@JsonError
+			do err.addMessage(@errInvalidKey)
+			ret err
+		end if
+		ret me.value.get(key)
+	end func
+	
+	
+	+*func toBool(): bool
+		ret ^me.value > 0
+	end func
+	
+	
+	+*func toInt(value: &int): bool
+		do value :: me.len()
+		ret true
+	end func
+	
+	
+	+*func toFloat(value: &float): bool
+		do value :: me.len()$float
+		ret true
+	end func
+	
+	
+	+*func dump(): []char
+		var keys: [][]char :: me.value.toArrayKey()
+		var text: []char :: "{"
+		
+		for index(0, ^keys - 1)
+			do text :~ "\"\{keys[index]}\":"
+			do text :~ me.value.get(keys[index]).dump()
+			if (index < ^keys - 1)
+				do text :~ ","
+			end if
+		end for
+		
+		do text :~ "}"
+		ret text
+	end func
+	
+	
+	+func len(): int
+		ret ^me.value
+	end func
+	
+	
+	+func add(key: []char, item: @Json)
+		do item.setParent(me)
+		do me.value.add(key, item)
+	end func
+	
+	
+	{ TODO: dictに削除メソッドが追加されるまでお預け
+	+func del(key: []char): bool
+		if (me.value.exist(key) & me.value.get(key) <>& null)
+			; TODO
+			ret true
+		end if
+		
+		ret false
+	end func
+	}
+	
+	
+	+func forEach(callback: func<([]char, @Json, kuin@Class): bool>, data: kuin@Class): bool
+		ret me.value.forEach(callback, data)
+	end func
+	
+	
+	+func exist(key: []char): bool
+		ret me.value.exist(key)
+	end func
+	
+	
+	+func toArrayKey(): [][]char
+		ret me.value.toArrayKey()
+	end func
+	
+	
+	+func toArrayValue(): []@Json
+		ret me.value.toArrayValue()
+	end func
+end class
+
+
+
++class JsonError(@Json)
+	var value: list<[]char>
+	
+	
+	*func ctor()
+		do me.value :: #list<[]char>
+	end func
+	
+	
+	+*func type(): @JsonType
+		ret %jerr
+	end func
+	
+	
+	+func addMessage(message: []char)
+		do me.value.add(message)
+	end func
+	
+	
+	+func getMessages(): [][]char
+		ret me.value.toArray()
+	end func
+	
+	
+	+*func toStr(): []char
+		var text: []char :: ""
+		
+		do me.value.head()
+		while(!me.value.term())
+			do text :~ me.value.get() ~ "\n"
+			do me.value.next()
+		end while
+		
+		ret text
+	end func
+end class
+
+
+
++class JsonParser()
+	var scanner: @StrScanner
+	
+	+func setup(scanner: @StrScanner)
+		do me.scanner :: scanner
+	end func
+	
+	
+	+func parseValue(): @Json
+		do me.scanner.skipWS()
+		
+		switch(me.scanner.current())
+		case '{'
+			ret me.parseObject()
+			
+		case '['
+			ret me.parseArray()
+			
+		case '"'
+			ret me.parseString()
+			
+		case '-', '+', '0' to '9'
+			ret me.parseNumeric()
+			
+		default
+			ret me.parseWord()
+		end switch
+	end func
+	
+	
+	func parseObject(): @Json
+		var json: @JsonObject :: #@JsonObject
+		
+		do me.scanner.next()
+		do me.scanner.skipWS()
+		
+		if (me.scanner.current() = '}')
+			do me.scanner.next()
+			ret json
+		end if
+		
+		while loop(true)
+			var key: @Json :: me.parseString()
+			
+			if (json.exist(key.toStr()))
+				throw @himeJsonSameKeyExists
+			end if
+			
+			do me.scanner.skipWS()
+			if (me.scanner.current() <> ':')
+				throw @himeJsonInvalidDataFmt
+			end if
+			do me.scanner.next()
+			do me.scanner.skipWS()
+			
+			do json.add(key.toStr(), me.parseValue())
+			do me.scanner.skipWS()
+			
+			if (me.scanner.current() = '}')
+				if (!me.scanner.term())
+					do me.scanner.next()
+				end if
+				ret json
+			
+			elif (me.scanner.current() <> ',')
+				throw @himeJsonNoComma
+			end if
+			
+			do me.scanner.next()
+			do me.scanner.skipWS()
+		end while
+	end func
+	
+	
+	func parseArray(): @Json
+		var json: @JsonArray :: #@JsonArray
+		
+		do me.scanner.next()
+		do me.scanner.skipWS()
+		
+		if (me.scanner.current() = ']')
+			do me.scanner.next()
+			ret json
+		end if
+		
+		while loop(true)
+			do json.add(me.parseValue())
+			do me.scanner.skipWS()
+			
+			if (me.scanner.current() = ']')
+				if (!me.scanner.term())
+					do me.scanner.next()
+				end if
+				ret json
+			
+			elif (me.scanner.current() <> ',')
+				throw @himeJsonNoComma
+			end if
+			
+			do me.scanner.next()
+			do me.scanner.skipWS()
+		end while
+	end func
+	
+	
+	func parseString(): @Json
+		do me.scanner.clear()
+		
+		var escChars: []char :: "\"\\/bfnrt"
+		do me.scanner.next()
+		
+		while loop(!me.scanner.term())
+			switch(me.scanner.current())
+			case '\\'
+				do me.scanner.addCharNext()
+				if (escChars.find(me.scanner.current(), -1) <> -1)
+					do me.scanner.addCharNext()
+					
+				elif (me.scanner.current() = 'u')
+					do me.scanner.addCharNext()
+					for unicode(0, 3)
+						if (me.isHex(me.scanner.current()))
+							do me.scanner.addCharNext()
+						else
+							throw @himeJsonInvalidDataFmt
+						end if
+					end for
+				end if
+			
+			case '"'
+				do me.scanner.next()
+				break loop
+				
+			default
+				if (me.isControl(me.scanner.current()))
+					throw @himeJsonControlCharacterExists
+				end if
+				do me.scanner.addCharNext()
+			end switch
+		end while
+		
+		var json: @JsonString :: #@JsonString
+		do json.setValue(me.scanner.text())
+		ret json
+	end func
+	
+	
+	func parseNumeric(): @Json
+		do me.scanner.clear()
+		
+		; [+-]123, [+-]123.456, [+-]123.456[eE][+-]123
+		if (me.isSign(me.scanner.current()))
+			do me.scanner.addCharNext()
+		end if
+		
+		while (me.isNumeric(me.scanner.current()))
+			do me.scanner.addCharNext()
+		end while
+		
+		if (me.isDot(me.scanner.current()))
+			do me.scanner.addCharNext()
+			while (me.isNumeric(me.scanner.current()))
+				do me.scanner.addCharNext()
+			end while
+		end if
+		
+		if (me.isExponent(me.scanner.current()))
+			do me.scanner.addCharNext()
+			if (me.isSign(me.scanner.current()))
+				do me.scanner.addCharNext()
+			end if
+			while (me.isNumeric(me.scanner.current()))
+				do me.scanner.addCharNext()
+			end while
+		end if
+		
+		var numeric: float
+		if (!me.scanner.text().toFloat(&numeric))
+			throw @himeJsonInvalidDataFmt
+		end if
+		
+		var json: @JsonNumeric :: #@JsonNumeric
+		do json.setValue(numeric)
+		ret json
+	end func
+	
+	
+	func parseWord(): @Json
+		do me.scanner.clear()
+		
+		while loop(me.isWordChar(me.scanner.current()))
+			do me.scanner.addCharNext()
+		end while
+		
+		switch(me.scanner.text())
+		case "true", "false"
+			var json: @JsonBool :: #@JsonBool
+			do json.setValue(me.scanner.text() = "true")
+			ret json
+			
+		case "null"
+			ret #@Json
+		
+		default
+			throw @himeJsonInvalidWord
+		end switch
+	end func
+	
+	
+	func isSign(c: char): bool
+		ret (c = '+' | c = '-')
+	end func
+
+
+	func isNumeric(c: char): bool
+		ret (c >= '0' & c <= '9')
+	end func
+
+
+	func isDot(c: char): bool
+		ret (c = '.')
+	end func
+
+
+	func isExponent(c: char): bool
+		ret (c = 'e' | c = 'E')
+	end func
+	
+	
+	func isHex(c: char): bool
+		ret (c >= '0' & c <= '9') | (c >= 'a' & c <= 'f') | (c >= 'A' & c <= 'F')
+	end func
+	
+	
+	func isControl(c: char): bool
+		ret (me.scanner.current()$int < 32)
+	end func
+	
+	
+	func isWordChar(c: char): bool
+		ret (c >= 'a' & c <= 'z') | (c >= 'A' & c <= 'Z')
+	end func
+end class
+
+
+
++class StrScanner()
+	var _text: []char
+	
+	
+	+func clear()
+		do me._text :: ""
+	end func
+	
+	
+	+func current(): char
+		ret '\0'
+	end func
+	
+	
+	+func text(): []char
+		ret me._text
+	end func
+	
+	
+	+func addChar(c: char)
+		do me._text :~ c.toStr()
+	end func
+	
+	
+	+func addCharNext()
+		do me.addChar(me.current())
+		do me.next()
+	end func
+	
+	
+	+func next()
+	end func
+	
+	
+	+func prev()
+	end func
+	
+	
+	+func skipWS()
+		while loop(!me.term())
+			if (me.current()$int <= 32)
+				do me.next()
+			else
+				break loop
+			end if
+		end while
+	end func
+	
+	
+	+func term(): bool
+		ret true
+	end func
+end class
+
+
+
++class FileScanner(@StrScanner)
+	var cur:  char
+	var path: []char
+	var reader: file@Reader
+	
+	
+	+func setup(path: []char)
+		do me.path :: path
+		do me.reader :: file@makeReader(path)
+		if (me.reader =& null)
+			throw excpt@fileReadFailed
+		end if
+		do me.next()
+	end func
+	
+	
+	+func dispose()
+		do me.reader.fin()
+	end func
+	
+	
+	+*func current(): char
+		ret me.cur
+	end func
+	
+	
+	+*func next()
+		do me.cur :: me.reader.readLetter()
+	end func
+	
+	
+	+*func prev()
+		do me.reader.setPos(%cur, -2)
+		do me.next()
+	end func
+	
+	
+	+*func term(): bool
+		ret me.reader.term()
+	end func
+end class
+
+
+
++class TextScanner(@StrScanner)
+	var data: []char
+	var index: int
+	
+	
+	+func setup(data: []char)
+		do me.data :: data
+		do me.index :: 0
+	end func
+	
+	
+	+*func current(): char
+		ret me.data[me.index]
+	end func
+	
+	
+	+*func next()
+		if (me.term())
+			throw excpt@invalidDataFmt
+		end if
+		do me.index :+ 1
+	end func
+	
+	
+	+*func prev()
+		if (me.index <= 0)
+			throw excpt@invalidDataFmt
+		end if
+		do me.index :- 1
+	end func
+	
+	
+	+*func term(): bool
+		ret me.index >= ^me.data - 1
+	end func
+end class

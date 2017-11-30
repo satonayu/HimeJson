@@ -1,0 +1,367 @@
+; himeJsonTest (C)satochi@http://hime.be/
+
+{
+	各種ファイルを以下のように配置してテスト実施
+	./main.kn
+	./be/hime/json.kn
+	./res/test_FileScanner.json
+	./res/test_JsonParser.json
+	./be/hime/json.kn
+}
+
+func main()
+	do test_Json()
+	do test_JsonBool()
+	do test_JsonNumeric()
+	do test_JsonString()
+	do test_JsonArray()
+	do test_JsonObject()
+	do test_JsonError()
+	
+	do test_StrScanner()
+	do test_FileScanner()
+	do test_TextScanner()
+	
+	do test_JsonParserFromFile()
+	do test_JsonParserFromText()
+	
+	
+	
+	func test_Json()
+		var json: \be\hime\json@Json :: #\be\hime\json@Json
+		var json2: \be\hime\json@Json :: #\be\hime\json@Json
+		
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jnull), "Json@null")
+		do @assertTrue((json.root() =& json), "Json@root(1)")
+		do @assertTrue((json.parent().type() = %jerr), "Json@parent(1)")
+		
+		do json.setParent(json2)
+		do @assertTrue((json.root() =& json2), "Json@root(2)")
+		do @assertTrue((json.parent() =& json2), "Json@parent(2)")
+		
+		do @assertTrue((json.find("a").type() = %jerr), "Json@find")
+		do @assertTrue((json.at("") =& json), "Json@at(1)")
+		do @assertTrue((json.at("./") =& json), "Json@at(2)")
+		do @assertTrue((json.at("../") =& json2), "Json@at(3)")
+		do @assertTrue((json.at("a").type() = %jerr), "Json@at(4)")
+		do @assertTrue(!json.toBool(), "Json@toBool")
+		do @assertTrue(!json.toInt(&), "Json@toInt")
+		do @assertTrue((json.toi() = 0), "Json@toi")
+		do @assertTrue(!json.toFloat(&), "Json@toFloat")
+		do @assertTrue((json.tof() = 0.0), "Json@tof")
+		do @assertTrue((json.toStr() = ""), "Json@toStr")
+		do @assertTrue((json.toStrFmt("") = ""), "Json@toStrFmt")
+		
+		do @totalResult("@Json")
+	end func
+	
+	
+	func test_JsonBool()
+		var json: \be\hime\json@JsonBool :: #\be\hime\json@JsonBool
+		var json2: \be\hime\json@JsonBool :: #\be\hime\json@JsonBool
+		
+		do json.setValue(true)
+		do json2.setValue(false)
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jbool), "JsonBool@type")
+		do @assertTrue((json.toBool() & !json2.toBool()), "JsonBool@toBool")
+		do @assertTrue((json.toi() = 1 & json2.toi() = 0), "JsonBool@toInt")
+		do @assertTrue((json.tof() = 1.0 & json2.tof() = 0.0), "JsonBool@toFloat")
+		do @assertTrue((json.toStr() = "true" & json2.toStr() = "false"), "JsonBool@toStr")
+		
+		do @totalResult("@JsonBool")
+	end func
+	
+	
+	func test_JsonNumeric()
+		var json: \be\hime\json@JsonNumeric :: #\be\hime\json@JsonNumeric
+		var json2: \be\hime\json@JsonNumeric :: #\be\hime\json@JsonNumeric
+		
+		do json.setValue(1.1)
+		do json2.setValue(0.0)
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jnum), "JsonNumeric@type")
+		do @assertTrue((json.toBool() & !json2.toBool()), "JsonNumeric@toBool")
+		do @assertTrue((json.toi() = 1), "JsonNumeric@toInt")
+		do @assertTrue((json.tof() = 1.1), "JsonNumeric@toFloat")
+		do @assertTrue((json.toStr() = "1.1"), "JsonNumeric@toStr")
+		do @assertTrue((json.toStrFmt("e") = "1.100000e+00"), "JsonNumeric@toStrFmt")
+		
+		do @totalResult("@JsonNumeric")
+	end func
+	
+	
+	func test_JsonString()
+		var json: \be\hime\json@JsonString :: #\be\hime\json@JsonString
+		var json2: \be\hime\json@JsonString :: #\be\hime\json@JsonString
+		var json3: \be\hime\json@JsonString :: #\be\hime\json@JsonString
+		
+		do json.setValue("aiueo")
+		do json2.setValue("111.222")
+		do json3.setValue("false")
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jstr), "JsonString@type")
+		do @assertTrue((json2.toBool() & !json3.toBool()), "JsonString@toBool")
+		do @assertTrue((json2.toi() = 111), "JsonString@toInt")
+		do @assertTrue((json2.tof() = 111.222), "JsonString@toFloat")
+		do @assertTrue((json.toStr() = "aiueo"), "JsonString@toStr")
+
+		do @totalResult("@JsonString")
+	end func
+	
+	
+	func test_JsonArray()
+		var json: \be\hime\json@JsonArray :: #\be\hime\json@JsonArray
+		var json2: \be\hime\json@JsonArray :: #\be\hime\json@JsonArray
+		
+		do json.add(#\be\hime\json@Json)
+		do json.add(#\be\hime\json@JsonBool)
+		do json.add(#\be\hime\json@JsonNumeric)
+		do json.add(#\be\hime\json@JsonString)
+		do json.add(#\be\hime\json@JsonArray)
+		do json.add(#\be\hime\json@JsonObject)
+		
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jary), "JsonArray@type")
+		do @assertTrue((json.find("1").type() = %jbool), "JsonArray@find")
+		do @assertTrue((json.find("a").type() = %jerr), "JsonArray@find(@errIndexType)")
+		do @assertTrue((json.len() = 6), "JsonArray@len")
+		do @assertTrue((json.find("-1").type() = %jerr & json.find(json.len().toStr()).type() = %jerr),
+			|"JsonArray@find(@errIndexRange)")
+		do @assertTrue((json.toBool() & !json2.toBool()), "JsonArray@toBool")
+		do @assertTrue((json.toi() = 6), "JsonArrayg@toInt")
+		do @assertTrue((json.tof() = 6.0), "JsonArray@toFloat")
+		
+		var addData: \be\hime\json@Json :: #\be\hime\json@Json
+		do json.addAt(1, addData)
+		do @assertTrue((json.at("1").type() = %jnull), "JsonArray@addAt")
+		
+		do json.del(addData)
+		do @assertTrue((json.at("1").toStr() = "false"), "JsonArray@del")
+		
+		do json.addAt(1, addData)
+		do json.delAt(1)
+		do @assertTrue((json.at("1").toStr() = "false"), "JsonArray@delAt")
+		
+		do json.forEach(@testArrayFoeEach, json2)
+		do @assertTrue((json.at("2") =& json2.at("2")), "JsonArray@forEach")
+		do @assertTrue((json2.len() = 4), "JsonArray@forEach")
+		
+		do @assertTrue(!json.hasItem(addData), "JsonArray@hasItem (1)")
+		do json.addAt(1, addData)
+		do @assertTrue(json.hasItem(addData), "JsonArray@hasItem (2)")
+		
+		do @totalResult("@JsonArray")
+	end func
+	
+	
+	func test_JsonObject()
+		var json: \be\hime\json@JsonObject :: #\be\hime\json@JsonObject
+		var json2: \be\hime\json@JsonObject :: #\be\hime\json@JsonObject
+		
+		do json.add("a", #\be\hime\json@Json)
+		do json.add("b", #\be\hime\json@JsonBool)
+		do json.add("c", #\be\hime\json@JsonNumeric)
+		do json.add("d", #\be\hime\json@JsonString)
+		do json.add("e", #\be\hime\json@JsonArray)
+		do json.add("f", #\be\hime\json@JsonObject)
+		
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jobj), "JsonObject@type")
+		do @assertTrue((json.exist("a") & !json.exist("z")), "JsonObject@exist")
+		do @assertTrue((json.find("b").type() = %jbool), "JsonObject@find")
+		do @assertTrue((json.find("z").type() = %jerr), "JsonObject@find(@errInvalidKey)")
+		do @assertTrue((json.len() = 6), "JsonObject@len")
+		do @assertTrue((json.toBool() & !json2.toBool()), "JsonObject@toBool")
+		do @assertTrue((json.toi() = 6), "JsonObjectg@toInt")
+		do @assertTrue((json.tof() = 6.0), "JsonObject@toFloat")
+		
+		{ TODO: dictに削除メソッドが追加されるまでお預け
+		do json.del(addData)
+		do @assertTrue((json.at("1").toStr() = "false"), "JsonObject@del")
+		}
+		
+		do @totalResult("@JsonObject")
+	end func
+	
+	
+	func test_JsonError()
+		var json: \be\hime\json@JsonError :: #\be\hime\json@JsonError
+		
+		do json.addMessage("a")
+		do json.addMessage("b")
+		do @testClear()
+		
+		do @assertTrue((json.type() = %jerr), "JsonError@type")
+		do @assertTrue((^(json.getMessages()) = 2), "JsonError@getMessage")
+		do @assertTrue((json.toStr() = "a\nb\n"), "JsonError@toStr")
+		
+		do @totalResult("@JsonError")
+	end func
+	
+	
+	func test_StrScanner()
+		var scanner: \be\hime\json@StrScanner :: #\be\hime\json@StrScanner
+		
+		do scanner.clear()
+		do @testClear()
+		
+		do @assertTrue((scanner.current() = '\0'), "StrScanner@current")
+		do @assertTrue((scanner.text() = ""), "StrScanner@test")
+		
+		do scanner.addChar('a')
+		do @assertTrue((scanner.text() = "a"), "StrScanner@addChar")
+		
+		do scanner.addCharNext()
+		do @assertTrue((scanner.text() = "a\0"), "StrScanner@addCharNext()")
+		
+		do @assertTrue(scanner.term(), "StrScanner@term")
+		
+		do @totalResult("@StrScanner")
+	end func
+	
+	
+	func test_FileScanner()
+		var scanner: \be\hime\json@FileScanner :: #\be\hime\json@FileScanner
+		
+		do scanner.setup("res/test_FileScanner.json")
+		do scanner.clear()
+		do @testClear()
+		
+		do @assertTrue((scanner.current() = '['), "FileScanner@current")
+		
+		do scanner.addCharNext()
+		do @assertTrue((scanner.current() = '1'), "FileScanner@addCharNext(1)")
+		do @assertTrue((scanner.text() = "["), "FileScanner@addCharNext(2)")
+		
+		do scanner.next()
+		do scanner.next()
+		do scanner.skipWS()
+		do @assertTrue((scanner.current() = '2'), "FileScanner@skipWS")
+		
+		do scanner.next()
+		do @assertTrue((scanner.current() = ']'), "FileScanner@next")
+		do scanner.prev()
+		do @assertTrue((scanner.current() = '2'), "FileScanner@prev")
+		
+		do @assertTrue(!scanner.term(), "FileScanner@term(1)")
+		do scanner.next()
+		do scanner.next()
+		do @assertTrue(scanner.term(), "FileScanner@term(2)")
+		
+		do @totalResult("@FileScanner")
+	end func
+	
+	
+	func test_TextScanner()
+		var scanner: \be\hime\json@TextScanner :: #\be\hime\json@TextScanner
+		
+		do scanner.setup("[1,\n  2]\n")
+		do scanner.clear()
+		do @testClear()
+		
+		do @assertTrue((scanner.current() = '['), "TextScanner@current")
+		
+		do scanner.addCharNext()
+		do @assertTrue((scanner.current() = '1'), "TextScanner@addCharNext(1)")
+		do @assertTrue((scanner.text() = "["), "TextScanner@addCharNext(2)")
+		
+		do scanner.next()
+		do scanner.next()
+		do scanner.skipWS()
+		do @assertTrue((scanner.current() = '2'), "TextScanner@skipWS")
+		
+		do scanner.next()
+		do @assertTrue((scanner.current() = ']'), "TextScanner@next")
+		do scanner.prev()
+		do @assertTrue((scanner.current() = '2'), "TextScanner@prev")
+		
+		do @assertTrue(!scanner.term(), "TextScanner@term(1)")
+		do scanner.next()
+		do scanner.next()
+		do @assertTrue(scanner.term(), "TextScanner@term(2)")
+		
+		do @totalResult("@TextScanner")
+	end func
+	
+	
+	func test_JsonParserFromFile()
+		var json: \be\hime\json@Json :: \be\hime\json@makeJsonF("res/test_JsonParser.json")
+		
+		do @testClear()
+		
+		do @assertTrue((json.at("a/b").toi() = 1), "JsonParser(1)")
+		do @assertTrue((json.at("b/b").toi() = 1), "JsonParser(2)")
+		do @assertTrue((json.at("c/0").toi() = 1), "JsonParser(3)")
+		do @assertTrue((json.at("d/0").toi() = 1), "JsonParser(4)")
+		do @assertTrue((json.at("i").toStr() = "aiueo"), "JsonParser(5)")
+		do @assertTrue((json.at("j").toStr() = "a\\\"\\\\\\/\\b\\f\\n\\r\\tb"), "JsonParser(6)")
+		do @assertTrue((json.at("k").toi() = 1), "JsonParser(7)")
+		do @assertTrue((json.at("l").toi() = 1), "JsonParser(8)")
+		do @assertTrue((json.at("m").toi() = -1), "JsonParser(9)")
+		do @assertTrue((json.at("n").tof() = 1.1), "JsonParser(10)")
+		do @assertTrue((json.at("o").tof() = 1100.0), "JsonParser(11)")
+		do @assertTrue((json.at("p").tof() = 0.0011), "JsonParser(12)")
+		do @assertTrue(json.at("q").toBool(), "JsonParser(13)")
+		do @assertTrue(!json.at("r").toBool(), "JsonParser(14)")
+		do @assertTrue((json.at("s").type() = %jnull), "JsonParser(15)")
+		
+		do @totalResult("@JsonParser")
+	end func
+	
+	
+	func test_JsonParserFromText()
+		var json: \be\hime\json@Json :: \be\hime\json@makeJsonT("{\"a\":\"a\"}")
+		var json2: \be\hime\json@Json :: \be\hime\json@makeJsonT("[1]")
+		
+		do @testClear()
+		
+		do @assertTrue((json.at("a").toStr() = "a"), "makeJsonT(1)")
+		do @assertTrue((json2.at("0").toi() = 1), "makeJsonT(2)")
+		do @assertTrue((json.dump() = "{\"a\":\"a\"}"), "Json@dump")
+		
+		do @totalResult("makeJsonT")
+	end func
+end func
+
+
+
+var testCnt: int
+var errCnt:  int
+
+func testClear()
+	do @testCnt :: 0
+	do @errCnt  :: 0
+end func
+
+
+func assertTrue(result: bool, message: []char)
+	do @testCnt :+ 1
+	if (!result)
+		do @errCnt :+ 1
+		do cui@print("[Assert Failed] \{message}\n")
+	end if
+end func
+
+
+func totalResult(target: []char)
+	if (@errCnt = 0)
+		do cui@print("Succeeded!(\{@testCnt} tests)(class: \{target})\n\n")
+	end if
+end func
+
+
+func testArrayFoeEach(item: \be\hime\json@Json, data: \be\hime\json@JsonArray): bool
+	if (item.type() = %jary)
+		ret false
+	end if
+	do data.add(item)
+	ret true
+end func
