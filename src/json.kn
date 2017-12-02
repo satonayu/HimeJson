@@ -442,6 +442,7 @@ end class
 		while(!me.value.term())
 			if (me.value.get() =& item)
 				do me.value.del()
+				do item.setParent(null)
 				ret true
 			end if
 			do me.value.next()
@@ -459,6 +460,7 @@ end class
 			ret false
 		end if
 		
+		do me.value.get().setParent(null)
 		do me.value.del()
 		ret true
 	end func
