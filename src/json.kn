@@ -823,7 +823,9 @@ end class
 		end if
 		
 		var numeric: float
-		if (!me.scanner.text().toFloat(&numeric))
+		var existed: bool
+		numeric :: me.scanner.text().toFloat(&existed)
+		if (!existed)
 			throw @himeJsonInvalidDataFmt
 		end if
 		
