@@ -524,7 +524,7 @@ end class
 			do err.addMessage(@errInvalidKey)
 			ret err
 		end if
-		ret me.value.get(key)
+		ret me.value.get(key, &)
 	end func
 	
 	
@@ -551,7 +551,7 @@ end class
 		
 		for index(0, ^keys - 1)
 			do text :~ "\"\{keys[index]}\":"
-			do text :~ me.value.get(keys[index]).dump()
+			do text :~ me.value.get(keys[index], &).dump()
 			if (index < ^keys - 1)
 				do text :~ ","
 			end if
