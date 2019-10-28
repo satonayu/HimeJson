@@ -11,19 +11,19 @@
 
 
 ; 入力された値の形式が不正
-+const himeJsonInvalidDataFmt: int :: 16#00001001
++const himeJsonInvalidDataFmt: int :: 0x00001001
 
 ; 文字列に制御文字が使われている場合に発生
-+const himeJsonControlCharacterExists: int :: 16#00001002
++const himeJsonControlCharacterExists: int :: 0x00001002
 
 ; 要素がカンマで区切られていない場合に発生
-+const himeJsonNoComma: int :: 16#00001003
++const himeJsonNoComma: int :: 0x00001003
 
 ; オブジェクト要素で同じキーがすでに存在している
-+const himeJsonSameKeyExists: int :: 16#00001004
++const himeJsonSameKeyExists: int :: 0x00001004
 
 ; true, false, null以外の単語が入力された
-+const himeJsonInvalidWord: int :: 16#00001005
++const himeJsonInvalidWord: int :: 0x00001005
 
 
 ; エラーメッセージ
