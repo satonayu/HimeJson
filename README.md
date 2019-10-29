@@ -54,8 +54,8 @@ do cui@print( json.at("b/3/name").toStr() ) { => "satochi" }
 #### 2. 取得したデータをKuinの型に変換
 ```kuin
 @Json.toBool(): bool
-@Json.toInt(value: &int): bool
-@Json.toFloat(value: &float): bool
+@Json.toInt(existed: &bool): int
+@Json.toFloat(existed: &bool): float
 @Json.toStr(): []char
 @Json.toStrFmt(fmt: []char): []char
 ```
@@ -64,6 +64,7 @@ do cui@print( json.at("b/3/name").toStr() ) { => "satochi" }
 
 また、HimeJsonでは数値を簡単に取得できるよう、以下のメソッドを追加で用意しています。  
 ただし、Kuinの`toInt`や`toFloat`が変換できない値を保持していた場合、想定していない数値を取得している事に気づくチャンスを失います。
+（`toInt`と`toFloat`の仕様変更により、存在価値なくなったかな。)
 ```kuin
 @Json.toi(): int
 @Json.tof(): float
