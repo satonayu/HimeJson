@@ -47,9 +47,17 @@ func main()
 		do @assertTrue((json.at("../") =& json2), "Json@at(3)")
 		do @assertTrue((json.at("a").type() = %jerr), "Json@at(4)")
 		do @assertTrue(!json.toBool(), "Json@toBool")
-		do @assertTrue(!json.toInt(&), "Json@toInt")
+
+		var existedToInt: bool
+		do json.toInt(&existedToInt)
+		do @assertTrue(!existedToInt, "Json@toInt")
+
 		do @assertTrue((json.toi() = 0), "Json@toi")
-		do @assertTrue(!json.toFloat(&), "Json@toFloat")
+
+		var existedToFloat: bool
+		do json.toFloat(&existedToFloat)
+		do @assertTrue(!existedToFloat, "Json@toFloat")
+
 		do @assertTrue(lib@same(json.tof(), 0.0), "Json@tof")
 		do @assertTrue((json.toStr() = ""), "Json@toStr")
 		do @assertTrue((json.toStrFmt("") = ""), "Json@toStrFmt")
